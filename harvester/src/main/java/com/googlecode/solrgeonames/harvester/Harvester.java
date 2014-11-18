@@ -18,32 +18,18 @@
  */
 package com.googlecode.solrgeonames.harvester;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.UnsupportedEncodingException;
+import org.apache.solr.client.solrj.SolrServer;
+import org.apache.solr.client.solrj.impl.HttpSolrServer;
+import org.apache.solr.common.SolrInputDocument;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.logging.Level;
-
-import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
-import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.core.CoreContainer;
-import org.apache.solr.core.CoreDescriptor;
-import org.apache.solr.core.SolrConfig;
-import org.apache.solr.core.SolrCore;
-import org.apache.solr.core.SolrResourceLoader;
-import org.apache.solr.schema.IndexSchema;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A harvester to parse and index the geo data into an embedded Solr index.
@@ -55,17 +41,13 @@ public class Harvester {
     private static Logger log = LoggerFactory.getLogger(Harvester.class);
 
     /** Geonames uses tab-delimited files */
-    private static String DELIMITER = "\t";
+    private static final String DELIMITER = "\t";
 
     /** Some constant counters */
-    private static int BATCH_SIZE = 20000;
-
-    /** Solr file names */
-    private static String SOLR_CONFIG = "solrconfig.xml";
-    private static String SOLR_SCHEMA = "schema.xml";
+    private static final int BATCH_SIZE = 20000;
 
     /** Solr Country Code */
-    private static String COUNTRY_BOOST = "AU";
+    private static final String COUNTRY_BOOST = "AU";
 
     /** Buffered Reader for line by line */
     private BufferedReader reader;
@@ -96,9 +78,7 @@ public class Harvester {
     }
 
     /** Solr index */
-    private SolrCore solrCore;
-    private CoreContainer solrContainer;
-    private EmbeddedSolrServer solrServer;
+    private SolrServer solrServer;
 
     /**
      * Basic constructor. Instantiate our reader and Solr.
@@ -134,38 +114,18 @@ public class Harvester {
 
         reader = new BufferedReader(fileReader);
 
-        // Time to bring Solr online
-        // Find the Solr home
-        String solrHome = System.getProperty("geonames.solr.home");
-        if (solrHome == null) {
-            throw new Exception("No 'geonames.solr.home' provided!");
-        }
-        solrServer = startSolr(solrHome);
+        solrServer = startSolr();
     }
 
     /**
      * Start up an embedded Solr server.
      *
-     * @param home: The path to the Solr home directory
      * @return EmbeddedSolrServer: The instantiated server
      * @throws Exception if any errors occur
      */
-    private EmbeddedSolrServer startSolr(String home) throws Exception {
+    private SolrServer startSolr() throws Exception {
         try {
-            SolrConfig solrConfig = new SolrConfig(home, SOLR_CONFIG, null);
-            IndexSchema schema = new IndexSchema(solrConfig, SOLR_SCHEMA, null);
-
-            solrContainer = new CoreContainer(new SolrResourceLoader(
-                    SolrResourceLoader.locateSolrHome()));
-            CoreDescriptor descriptor = new CoreDescriptor(solrContainer, "",
-                    solrConfig.getResourceLoader().getInstanceDir());
-            descriptor.setConfigName(solrConfig.getResourceName());
-            descriptor.setSchemaName(schema.getResourceName());
-
-            solrCore = new SolrCore(null, solrConfig.getDataDir(),
-                    solrConfig, schema, descriptor);
-            solrContainer.register("", solrCore, false);
-            return new EmbeddedSolrServer(solrContainer, "");
+            return new HttpSolrServer("http://localhost:8984/solr/cities");
         } catch(Exception ex) {
             log.error("\nFailed to start Solr server\n");
             throw ex;
@@ -372,9 +332,6 @@ public class Harvester {
             } catch (IOException ex) {
                 log.error("Error shutting down the Reader!", ex);
             }
-        }
-        if (solrContainer != null) {
-            solrContainer.shutdown();
         }
     }
 
