@@ -60,7 +60,6 @@
 
     <modules>
         <module>harvester</module>
-        <module>server</module>
     </modules>
 
     <dependencyManagement>
